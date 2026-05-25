@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 import tempfile
 import time
@@ -56,6 +57,29 @@ class LoginResult:
 def fail(message: str, code: int = 1) -> None:
     print(message, file=sys.stderr)
     raise SystemExit(code)
+
+
+def print_flush(message: str) -> None:
+    print(message, flush=True)
+
+
+def print_qr_instructions(qr_file: Path, qr_url: str) -> None:
+    markdown = f"![115 登录二维码]({qr_file.as_posix()})"
+    payload = {
+        "type": "115-login-qr",
+        "image_path": str(qr_file),
+        "image_uri": qr_file.as_uri(),
+        "remote_url": qr_url,
+        "markdown": markdown,
+        "instruction": "请用 115 App 扫码，并在手机上确认登录。",
+    }
+    print_flush("请用 115 App 扫码确认登录：")
+    print_flush(f"QR_IMAGE_PATH: {qr_file}")
+    print_flush(f"QR_FILE_URI: {qr_file.as_uri()}")
+    print_flush(f"QR_REMOTE_URL: {qr_url}")
+    print_flush(f"QR_MARKDOWN: {markdown}")
+    print_flush(f"LOGIN_QR_JSON: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}")
+    print_flush(f"如果 agent 没有成功展示图片，请手动打开该文件扫码：{qr_file}")
 
 
 def resolve_user_path(path: Any) -> Path:
@@ -139,14 +163,18 @@ def wait_for_scan(token: Dict[str, Any], poll_interval: int, timeout: int) -> No
         if timeout > 0 and time.monotonic() - started > timeout:
             raise RuntimeError("二维码等待超时，请重新运行登录脚本。")
         time.sleep(poll_interval)
-        status_data = response_data(request_json(status_url), "获取二维码状态")
+        try:
+            status_data = response_data(request_json(status_url), "获取二维码状态")
+        except (TimeoutError, socket.timeout, urllib.error.URLError) as exc:
+            print_flush(f"[status=?] 状态接口暂时无响应，继续等待扫码确认... ({exc})")
+            continue
         status = int(status_data.get("status", 0))
         if status == 0:
-            print("[status=0] 等待扫码...")
+            print_flush("[status=0] 等待扫码...")
         elif status == 1:
-            print("[status=1] 已扫码，请在手机上确认登录...")
+            print_flush("[status=1] 已扫码，请在手机上确认登录...")
         elif status == 2:
-            print("[status=2] 已确认登录。")
+            print_flush("[status=2] 已确认登录。")
             return
         elif status == -1:
             raise RuntimeError("二维码已过期，请重新运行登录脚本。")
@@ -181,11 +209,7 @@ def perform_login(
     qr_url = QR_URL.format(uid=urllib.parse.quote(uid))
     download_qr_image(qr_url, qr_file)
 
-    print("请用 115 App 扫码确认登录：")
-    print(f"二维码图片已保存到：{qr_file}")
-    print(f"QR_MARKDOWN: ![115 登录二维码]({qr_file.as_posix()})")
-    print(f"如果 agent 没有成功展示图片，请手动打开该文件扫码：{qr_file}")
-    print(qr_url)
+    print_qr_instructions(qr_file, qr_url)
     if not no_open:
         webbrowser.open(qr_file.as_uri())
 

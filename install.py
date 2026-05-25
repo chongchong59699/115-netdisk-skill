@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.parse
@@ -24,6 +25,7 @@ SKILL_NAME = "115-netdisk"
 SKILL_MARKERS = (f"{SKILL_NAME}/SKILL.md", "SKILL.md")
 SKILL_FILE_NAMES = {"SKILL.md", "requirements.txt"}
 SKILL_DIR_NAMES = {"agents", "assets", "references", "scripts"}
+MIN_DEPENDENCY_PYTHON = (3, 12)
 
 
 def fail(message: str, code: int = 1) -> None:
@@ -209,6 +211,95 @@ def verify_install(skill_dir: Path) -> None:
         fail("installation is incomplete; missing: " + ", ".join(missing))
 
 
+def python_version(command: Tuple[str, ...]) -> Optional[Tuple[int, int, int]]:
+    try:
+        completed = subprocess.run(
+            [*command, "-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    value = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else ""
+    try:
+        major, minor, micro = value.split(".", 2)
+        return int(major), int(minor), int(micro)
+    except ValueError:
+        return None
+
+
+def dependency_python_candidates() -> list[Tuple[str, ...]]:
+    commands: list[Tuple[str, ...]] = [(sys.executable,)]
+    if os.name == "nt":
+        commands.extend([("py", "-3.14"), ("py", "-3.13"), ("py", "-3.12")])
+    else:
+        commands.extend([("python3.14",), ("python3.13",), ("python3.12",), ("python3",), ("python",)])
+
+    seen = set()
+    unique = []
+    for command in commands:
+        key = tuple(command)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(command)
+    return unique
+
+
+def find_dependency_python() -> Optional[Tuple[str, ...]]:
+    for command in dependency_python_candidates():
+        version = python_version(command)
+        if version and version >= MIN_DEPENDENCY_PYTHON:
+            return command
+    return None
+
+
+def install_dependencies(skill_dir: Path, skip_deps: bool) -> None:
+    if skip_deps:
+        print("Skipped Python dependency installation because --no-deps was set.")
+        return
+
+    requirements = skill_dir / "requirements.txt"
+    if not requirements.exists():
+        print("No requirements.txt found; skipped Python dependency installation.")
+        return
+
+    python = find_dependency_python()
+    required = ".".join(map(str, MIN_DEPENDENCY_PYTHON))
+    if not python:
+        print(
+            f"Warning: Python {required}+ was not found; skipped p115client installation.\n"
+            "QR login still works with the system Python because scripts/login.py uses only the standard library.\n"
+            "Install Python 3.12+ and run: python -m pip install -r "
+            f"\"{requirements}\""
+        )
+        return
+
+    display_command = " ".join(f'"{part}"' if " " in part else part for part in python)
+    print(f"Installing Python dependencies with {display_command}: {requirements}")
+    try:
+        subprocess.run([*python, "-m", "pip", "install", "-r", str(requirements)], check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(
+            "Warning: failed to install Python dependencies automatically.\n"
+            f"Reason: {exc}\n"
+            f"Run manually with Python {required}+: python -m pip install -r \"{requirements}\""
+        )
+
+
+def compile_scripts(skill_dir: Path) -> None:
+    scripts_dir = skill_dir / "scripts"
+    scripts = sorted(scripts_dir.glob("*.py"))
+    if not scripts:
+        return
+    try:
+        subprocess.run([sys.executable, "-m", "py_compile", *map(str, scripts)], check=True)
+        print(f"Verified Python script syntax with {sys.executable}.")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Warning: Python script syntax verification failed: {exc}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Install the 115-netdisk Codex skill")
     parser.add_argument("--repo", help="GitHub repo in OWNER/REPO format")
@@ -217,6 +308,7 @@ def main() -> None:
     parser.add_argument("--archive-url", help="Explicit zip archive URL")
     parser.add_argument("--source-dir", help="Install from a local checkout instead of GitHub")
     parser.add_argument("--target-root", default=str(default_target_root()), help="Skills root directory")
+    parser.add_argument("--no-deps", action="store_true", help="Skip automatic p115client installation")
     args = parser.parse_args()
 
     owner = repo = ref = None
@@ -251,6 +343,8 @@ def main() -> None:
         shutil.copytree(staging / SKILL_NAME, target_dir)
 
     verify_install(target_dir)
+    compile_scripts(target_dir)
+    install_dependencies(target_dir, args.no_deps)
     print(f"Installed {SKILL_NAME} skill to: {target_dir}")
     print("First use will start 115 QR login automatically if ~/.115-cookies is missing or empty.")
     print(f"Manual login command: {sys.executable} \"{target_dir / 'scripts' / 'login.py'}\" --no-open")

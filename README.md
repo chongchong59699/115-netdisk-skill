@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/m
 ```
 
 
-如果希望 agent 直接自动安装，使用下面这一行。安装器只依赖 Python 标准库，不依赖 git，会把完整 skill 安装到本机 skills 目录：
+如果希望 agent 直接自动安装，使用下面这一行。安装器自身只依赖 Python 标准库，不依赖 git，会把完整 skill 安装到本机 skills 目录；如果本机能找到 Python 3.12+，会继续自动安装 `p115client` 依赖。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
@@ -26,6 +26,12 @@ curl.exe -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-ski
 ```
 
 默认安装位置为 `${CODEX_HOME}/skills/115-netdisk` 或 `~/.codex/skills/115-netdisk`。
+
+如需只复制 skill 文件、不安装 Python 依赖，可加 `--no-deps`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master --no-deps
+```
 
 ## 手动安装
 
@@ -58,11 +64,23 @@ Copy-Item -LiteralPath ".\115-netdisk-skill\scripts" -Destination $targetSkill -
 - Windows 备用扫码登录：`scripts/get_cookie.ps1`，需要 PowerShell 7。
 - 免 Python 备用方案：GitHub Releases 中的 `115-cookie-helper-*` 独立二进制。
 
-安装 Python 依赖：
+安装 Python 依赖必须使用 Python 3.12+：
 
 ```bash
-python -m pip install p115client
+python3.12 -m pip install p115client
 ```
+
+## Agent 兼容
+
+扫码登录需要兼容 Codex、OpenClaw、Hermes 和普通 CLI 类 agent。脚本和 release 二进制会同时输出这些二维码标记，agent 应监听 stdout 并选择自己支持的方式展示给用户：
+
+- `LOGIN_QR_JSON`：包含 `image_path`、`image_uri`、`remote_url`、`markdown` 的 JSON。
+- `QR_IMAGE_PATH`：本地 PNG 路径。
+- `QR_FILE_URI`：本地 `file://` URI。
+- `QR_REMOTE_URL`：115 二维码远程图片 URL。
+- `QR_MARKDOWN`：Markdown 图片语法。
+
+纯 CLI agent 至少应把 `QR_IMAGE_PATH` 或 `QR_REMOTE_URL` 原样告诉用户；支持图片附件的 agent 应直接展示 `QR_IMAGE_PATH` 指向的 PNG。shell 输出中出现 `QR_MARKDOWN` 不代表图片已经自动展示。
 
 ## 使用方式
 
@@ -77,7 +95,7 @@ python scripts/offline_download.py 'magnet:?xt=urn:btih:xxx'
 python scripts/offline_download.py --list
 ```
 
-登录脚本会保存二维码 PNG 并输出 `QR_MARKDOWN: ![115 登录二维码](...)`。agent 应把该图片发给用户；如果图片没有成功展示，应提示用户打开输出的二维码文件路径自行扫码。cookies 默认保存到 `~/.115-cookies`。
+登录脚本会保存二维码 PNG，并输出 `LOGIN_QR_JSON`、`QR_IMAGE_PATH`、`QR_FILE_URI`、`QR_REMOTE_URL` 与 `QR_MARKDOWN`。Codex、OpenClaw、Hermes 或 CLI agent 需要读取这些标记后，把对应图片作为普通回复发给用户，或者提示用户打开路径/URL 自行扫码。cookies 默认保存到 `~/.115-cookies`。
 
 ## 发布二进制
 
@@ -96,6 +114,7 @@ Release 产物包括 Windows、macOS 和 Linux 的独立二进制。
 .
 ├── SKILL.md
 ├── agents/
+│   ├── README.md
 │   └── openai.yaml
 ├── scripts/
 │   ├── browse.py

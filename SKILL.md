@@ -9,7 +9,19 @@ description: 115 网盘集成，支持 115扫码登录/115扫码登陆、二维�
 
 当用户给出本仓库的 `SKILL.md` 或 `install.py` 远程 URL 并要求安装时，必须安装完整 skill 文件集，而不是只保存这个 `SKILL.md` 文件，因为脚本都在 `scripts/` 中。本仓库采用“仓库根目录即 skill 根目录”的结构，关键文件包括 `SKILL.md`、`scripts/`、`agents/` 和 `requirements.txt`。
 
-推荐安装方式：使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill。安装器只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用。
+## Agent 兼容约定
+
+本 skill 需要兼容 Codex、OpenClaw、Hermes 和普通 CLI 类 agent。扫码登录脚本不会假设某个平台一定能渲染 Markdown 图片，而是同时输出多种稳定标记：
+
+- `LOGIN_QR_JSON`：紧凑 JSON，包含 `image_path`、`image_uri`、`remote_url`、`markdown`。
+- `QR_IMAGE_PATH`：二维码 PNG 本地路径，适合能上传/展示本地图片的 agent。
+- `QR_FILE_URI`：`file://` URI，适合能打开本地文件 URI 的 agent。
+- `QR_REMOTE_URL`：115 二维码远程图片 URL，适合纯 CLI 或无法读取本地图片的 agent。
+- `QR_MARKDOWN`：Markdown 图片语法，适合聊天界面支持本地图片渲染的 agent。
+
+所有 agent 在运行 `scripts/login.py --no-open` 或 release 二进制后，应监听 stdout；一旦看到上述任意二维码标记，就立即用自己支持的方式展示、打开或转述给用户，并保持进程继续运行等待用户扫码确认。单纯在 shell 输出里打印 `QR_MARKDOWN` 不等于已经把图片展示给用户。
+
+推荐安装方式：使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后如果能找到 Python 3.12+，会自动执行 `pip install -r requirements.txt` 安装 `p115client`。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
@@ -20,6 +32,8 @@ Windows 如果 `python` 命令不可用，优先尝试：
 ```powershell
 curl.exe -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | py - --repo chongchong59699/115-netdisk-skill --branch master
 ```
+
+如果用户只想复制 skill 文件、跳过依赖安装，可给安装器追加 `--no-deps`。
 
 如果用户只提供了 GitHub 上的 `SKILL.md` URL，也可以把 URL 传给安装器，安装器会反推出仓库和分支：
 
@@ -41,7 +55,7 @@ curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/m
    - 优先使用 `$CODEX_HOME/skills`
    - 未设置时使用 `~/.codex/skills`
    - 最终目录应为 `~/.codex/skills/115-netdisk/SKILL.md`
-4. 如果机器有 Python 3.12+，安装依赖：`python -m pip install p115client`；扫码登录脚本 `scripts/login.py` 只依赖 Python 标准库，不要求 Python 3.12。
+4. 安装器会自动寻找 Python 3.12+ 并安装 `requirements.txt`；扫码登录脚本 `scripts/login.py` 只依赖 Python 标准库，不要求 Python 3.12。如果未找到 Python 3.12+，安装器会跳过依赖安装并给出明确提示。
 5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果当前 Python 低于 3.12，只需告知用户网盘功能脚本需要 Python 3.12+，扫码登录仍可用。
 
 PowerShell 7 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
@@ -85,7 +99,7 @@ rm -rf "$tmp"
 
 默认 cookies 路径为 `~/.115-cookies`。当目录浏览、搜索、离线下载等脚本发现该文件不存在或内容为空时，会自动提醒用户扫码登录、生成 115 登录二维码 PNG、等待用户用 115 App 扫码确认，并把 cookies 保存到 `~/.115-cookies`。
 
-agent 看到脚本输出 `QR_MARKDOWN: ![115 登录二维码](...)` 或 `二维码图片已保存到：...` 后，应立即把二维码图片发给用户；如果图片发送失败，提醒用户打开该本地路径扫码。扫码登录成功后，脚本会默认输出用户基本信息和本 skill 支持的功能点。
+agent 看到脚本输出 `LOGIN_QR_JSON: ...`、`QR_IMAGE_PATH: ...`、`QR_FILE_URI: ...`、`QR_REMOTE_URL: ...` 或 `QR_MARKDOWN: ...` 后，应立即把二维码图片发给用户；Codex、OpenClaw、Hermes 或 CLI agent 都不应假设 shell 输出中的 Markdown 会自动弹图，必须由 agent 在普通回复中展示、打开或转述图片目标。如果图片发送失败，提醒用户打开该本地路径或远程 URL 扫码。扫码登录成功后，脚本会默认输出用户基本信息和本 skill 支持的功能点。
 
 ### 第一步：获取 Cookies
 
@@ -107,7 +121,7 @@ python3 scripts/login.py --no-open
 py -3 scripts/login.py --no-open
 ```
 
-脚本会把二维码保存为本地 PNG、输出 `QR_MARKDOWN: ![115 登录二维码](...)`，并继续轮询扫码状态。agent 应把 `QR_MARKDOWN` 这一行对应的图片发给用户；如果图片没有成功显示，必须提醒用户打开脚本输出的二维码文件路径自行扫码。用户用 115 App 扫码并确认后，脚本会自动获取 cookies 并默认保存到 `~/.115-cookies`。
+脚本会把二维码保存为本地 PNG、输出 `LOGIN_QR_JSON`、`QR_IMAGE_PATH`、`QR_FILE_URI`、`QR_REMOTE_URL` 和 `QR_MARKDOWN`，并继续轮询扫码状态。agent 应把二维码图片发给用户；如果图片没有成功显示，必须提醒用户打开脚本输出的二维码文件路径或远程 URL 自行扫码。用户用 115 App 扫码并确认后，脚本会自动获取 cookies 并默认保存到 `~/.115-cookies`。状态接口偶发 read timeout 时脚本会继续等待，不会立即退出。
 
 可选参数：
 

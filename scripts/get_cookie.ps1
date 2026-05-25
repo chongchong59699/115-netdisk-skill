@@ -50,6 +50,34 @@ function Resolve-AbsolutePath {
     return [System.IO.Path]::GetFullPath($resolved)
 }
 
+function ConvertTo-FileUri {
+    param([string]$Path)
+    return ([System.Uri]::new($Path)).AbsoluteUri
+}
+
+function Write-QrMarkers {
+    param([string]$ImagePath, [string]$RemoteUrl)
+    $fileUri = ConvertTo-FileUri $ImagePath
+    $markdownPath = $ImagePath.Replace("\", "/")
+    $markdown = "![115 登录二维码]($markdownPath)"
+    $payload = [ordered]@{
+        type = "115-login-qr"
+        image_path = $ImagePath
+        image_uri = $fileUri
+        remote_url = $RemoteUrl
+        markdown = $markdown
+        instruction = "请用 115 App 扫码，并在手机上确认登录。"
+    } | ConvertTo-Json -Compress
+
+    Write-Host "请用 115 App 扫码确认登录："
+    Write-Host "QR_IMAGE_PATH: $ImagePath"
+    Write-Host "QR_FILE_URI: $fileUri"
+    Write-Host "QR_REMOTE_URL: $RemoteUrl"
+    Write-Host "QR_MARKDOWN: $markdown"
+    Write-Host "LOGIN_QR_JSON: $payload"
+    Write-Host "如果 agent 没有成功展示图片，请手动打开该文件扫码：$ImagePath"
+}
+
 Write-Host "正在获取 115 登录二维码..."
 $tokenResponse = Invoke-RestMethod -Method Get -Uri "https://qrcodeapi.115.com/api/1.0/web/1.0/token/"
 $token = Get-ResponseData $tokenResponse "获取二维码 token"
@@ -66,10 +94,7 @@ if ($qrDir) {
 }
 Invoke-WebRequest -Method Get -Uri $qrUrl -OutFile $resolvedQrPath | Out-Null
 
-Write-Host "请用 115 App 扫码确认登录："
-Write-Host "二维码图片已保存到：$resolvedQrPath"
-Write-Host "如果 agent 发送图片失败，请打开上面的文件扫码。"
-Write-Host $qrUrl
+Write-QrMarkers -ImagePath $resolvedQrPath -RemoteUrl $qrUrl
 if (-not $NoOpen) {
     try {
         Start-Process $resolvedQrPath
@@ -87,7 +112,12 @@ $statusPayload = @{
 while ($true) {
     Start-Sleep -Seconds $PollIntervalSeconds
     $statusUrl = "https://qrcodeapi.115.com/get/status/?" + (ConvertTo-QueryString $statusPayload)
-    $statusResponse = Invoke-RestMethod -Method Get -Uri $statusUrl
+    try {
+        $statusResponse = Invoke-RestMethod -Method Get -Uri $statusUrl
+    } catch {
+        Write-Host "[status=?] 状态接口暂时无响应，继续等待扫码确认... ($($_.Exception.Message))"
+        continue
+    }
     $statusData = Get-ResponseData $statusResponse "获取二维码状态"
     $status = [int]$statusData.status
 

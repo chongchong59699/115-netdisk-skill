@@ -76,8 +76,7 @@ func main() {
 		fatalf("save QR code failed: %v", err)
 	}
 	fmt.Println("Open this URL and scan with the 115 app:")
-	fmt.Println(qr)
-	fmt.Printf("QR code image saved to: %s\n", qrFile)
+	printQRInstructions(qrFile, qr)
 	fmt.Printf("If the agent cannot render the image, open this file and scan it manually: %s\n", qrFile)
 	if !*noOpen {
 		if err := openBrowser(qrFile); err != nil {
@@ -173,7 +172,8 @@ func waitForLogin(client *http.Client, token tokenData, poll time.Duration) erro
 		time.Sleep(poll)
 		resp, err := getJSON(client, statusURL+"?"+query.Encode(), nil)
 		if err != nil {
-			return err
+			fmt.Printf("[status=?] status API did not respond, still waiting for scan confirmation... (%v)\n", err)
+			continue
 		}
 		var status statusData
 		if err := decodeData(resp, &status); err != nil {
@@ -195,6 +195,39 @@ func waitForLogin(client *http.Client, token tokenData, poll time.Duration) erro
 			return fmt.Errorf("unexpected QR status: %d", status.Status)
 		}
 	}
+}
+
+func printQRInstructions(qrFile, qr string) {
+	fileURI := pathToFileURI(qrFile)
+	markdown := fmt.Sprintf("![115 登录二维码](%s)", filepath.ToSlash(qrFile))
+	payload := map[string]string{
+		"type":        "115-login-qr",
+		"image_path":  qrFile,
+		"image_uri":   fileURI,
+		"remote_url":  qr,
+		"markdown":    markdown,
+		"instruction": "请用 115 App 扫码，并在手机上确认登录。",
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		data = []byte("{}")
+	}
+	fmt.Printf("QR_IMAGE_PATH: %s\n", qrFile)
+	fmt.Printf("QR_FILE_URI: %s\n", fileURI)
+	fmt.Printf("QR_REMOTE_URL: %s\n", qr)
+	fmt.Printf("QR_MARKDOWN: %s\n", markdown)
+	fmt.Printf("LOGIN_QR_JSON: %s\n", data)
+}
+
+func pathToFileURI(path string) string {
+	slashPath := filepath.ToSlash(path)
+	if runtime.GOOS == "windows" && len(slashPath) >= 2 && slashPath[1] == ':' {
+		slashPath = "/" + slashPath
+	}
+	if !strings.HasPrefix(slashPath, "/") {
+		slashPath = "/" + slashPath
+	}
+	return (&url.URL{Scheme: "file", Path: slashPath}).String()
 }
 
 func getLoginCookies(client *http.Client, uid, app string) (map[string]string, error) {
