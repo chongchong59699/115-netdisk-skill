@@ -135,3 +135,9 @@ Release 产物包括 Windows、macOS 和 Linux 的独立二进制。
     └── workflows/
         └── release.yml
 ```
+
+## 功能来源
+
+本项目的 115 网盘操作能力基于 [ChenyangGao/p115client](https://github.com/ChenyangGao/p115client)，用于完成目录浏览、文件搜索、离线下载任务添加与查询等 115 网盘接口操作。
+
+本项目的 115 扫码登录流程参考 [ChenyangGao/d26a592a0aeb13465511c885d5c7ad61](https://gist.github.com/ChenyangGao/d26a592a0aeb13465511c885d5c7ad61)，并在此基础上适配 Codex、OpenClaw、Hermes 和普通 CLI 类 agent 的二维码展示与 cookies 保存流程。
