@@ -4,6 +4,7 @@ This skill is designed to work with Codex, OpenClaw, Hermes, and plain CLI-style
 
 When a login helper starts, it writes multiple machine-readable QR markers. Agents should watch stdout and use the first marker they support:
 
+- `AGENT_ACTION_REQUIRED`: explicit notice that the QR image must be shown to the user immediately while the login process keeps running.
 - `LOGIN_QR_JSON`: compact JSON payload with `image_path`, `image_uri`, `remote_url`, and `markdown`.
 - `QR_IMAGE_PATH`: local PNG path. Best for agents that can attach or render local files.
 - `QR_FILE_URI`: `file://` URI for agents or terminals that can open local files.
@@ -16,6 +17,8 @@ Recommended behavior:
 2. As soon as a QR marker appears, show the QR image to the user or tell them exactly which path or URL to open.
 3. Keep the process running while the user scans and confirms in the 115 App.
 4. Treat transient `[status=?]` messages as network retries, not login failure.
+
+For tool-driven agents such as Codex, start the login command with a short initial wait/yield, read stdout, send the QR image in a normal chat message, and then continue polling the still-running command. Do not wait for the login command to finish before showing the QR image. `--timeout 0` only disables the script-side timeout; the 115 QR key can still expire.
 
 Plain shell output containing `QR_MARKDOWN` is not enough by itself; the agent must actively render, attach, open, or relay the QR target.
 

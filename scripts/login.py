@@ -69,15 +69,22 @@ def print_flush(message: str) -> None:
 
 def print_qr_instructions(qr_file: Path, qr_url: str) -> None:
     markdown = f"![115 登录二维码]({qr_file.as_posix()})"
+    agent_instruction = (
+        "show this QR image to the user immediately, then keep the login process "
+        "running until scan confirmation completes"
+    )
     payload = {
         "type": "115-login-qr",
+        "action": "show-image-immediately",
         "image_path": str(qr_file),
         "image_uri": qr_file.as_uri(),
         "remote_url": qr_url,
         "markdown": markdown,
         "instruction": "请用 115 App 扫码，并在手机上确认登录。",
+        "agent_instruction": agent_instruction,
     }
     print_flush("请用 115 App 扫码确认登录：")
+    print_flush(f"AGENT_ACTION_REQUIRED: {agent_instruction}")
     print_flush(f"QR_IMAGE_PATH: {qr_file}")
     print_flush(f"QR_FILE_URI: {qr_file.as_uri()}")
     print_flush(f"QR_REMOTE_URL: {qr_url}")
