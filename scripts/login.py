@@ -255,20 +255,13 @@ def try_print_account_info_with_venv(cookies: str) -> bool:
     except OSError:
         return False
 
-    code = r"""
+    code = f"""
 import sys
-from p115client import P115Client
+sys.path.insert(0, {str(SCRIPT_DIR)!r})
+from lib import print_basic_summary_from_cookies
 
 cookies = sys.stdin.read().strip()
-client = P115Client(cookies, check_for_relogin=True)
-info = client.user_info()
-if isinstance(info, dict) and info.get("state") is False:
-    raise RuntimeError(info)
-user = info.get("data", {}) if isinstance(info, dict) else {}
-print("\n═══ 账户信息 ═══")
-print(f"  用户名: {user.get('user_name')}")
-print(f"  用户ID: {user.get('user_id')}")
-print(f"  VIP:    {user.get('is_vip')}")
+print_basic_summary_from_cookies(cookies)
 """
     try:
         completed = subprocess.run(
@@ -292,7 +285,8 @@ def try_print_account_info(cookies: str) -> None:
         return
 
     try:
-        from p115client import P115Client
+        sys.path.insert(0, str(SCRIPT_DIR))
+        from lib import print_basic_summary_from_cookies
     except Exception as exc:
         print("\n已完成扫码登录，但当前 Python 环境暂不能读取账户详情。")
         print(f"原因：{exc}")
@@ -301,15 +295,7 @@ def try_print_account_info(cookies: str) -> None:
         return
 
     try:
-        client = P115Client(cookies, check_for_relogin=True)
-        info = client.user_info()
-        if isinstance(info, dict) and info.get("state") is False:
-            raise RuntimeError(info)
-        user = info.get("data", {}) if isinstance(info, dict) else {}
-        print("\n═══ 账户信息 ═══")
-        print(f"  用户名: {user.get('user_name')}")
-        print(f"  用户ID: {user.get('user_id')}")
-        print(f"  VIP:    {user.get('is_vip')}")
+        print_basic_summary_from_cookies(cookies)
     except Exception as exc:
         print(f"\n扫码登录已完成，但读取账户信息失败：{exc}")
     print_capabilities()

@@ -12,12 +12,16 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import fail, get_client, get_list_data, print_item
+from lib import FILE_LOGIN_HINT, concise_error, fail, get_client, get_list_data, looks_like_login_error, print_item
 
 
 def browse_dir(client, cid: int = 0, page: int = 1, limit: int = 50):
     """浏览指定目录。"""
-    result = client.fs_files_aps({"cid": cid, "limit": limit, "offset": (page - 1) * limit})
+    try:
+        result = client.fs_files_aps({"cid": cid, "limit": limit, "offset": (page - 1) * limit})
+    except Exception as exc:
+        hint = f"\n   {FILE_LOGIN_HINT}" if looks_like_login_error(exc) else ""
+        fail(f"❌ 浏览目录失败: {concise_error(exc)}{hint}")
     items = get_list_data(result, "浏览目录")
 
     if not items:
@@ -31,7 +35,11 @@ def browse_dir(client, cid: int = 0, page: int = 1, limit: int = 50):
 
 def search_files(client, keyword: str, limit: int = 30):
     """搜索文件。"""
-    result = client.fs_search({"search_value": keyword, "limit": limit})
+    try:
+        result = client.fs_search({"search_value": keyword, "limit": limit})
+    except Exception as exc:
+        hint = f"\n   {FILE_LOGIN_HINT}" if looks_like_login_error(exc) else ""
+        fail(f"❌ 搜索文件失败: {concise_error(exc)}{hint}")
     items = get_list_data(result, "搜索文件")
 
     if not items:

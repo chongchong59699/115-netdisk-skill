@@ -10,38 +10,43 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import format_size, get_client, get_list_data, print_item, require_success
+from lib import (
+    FILE_LOGIN_HINT,
+    concise_error,
+    get_client,
+    get_list_data,
+    load_basic_info,
+    looks_like_login_error,
+    print_basic_summary,
+    print_item,
+    require_success,
+)
 
 
 def main():
     print("🔌 正在连接 115 网盘...\n")
     client = get_client()
 
-    # 用户信息
-    info = require_success(client.user_info(), "连接 115")
-
-    user = info.get('data', {})
-    print("═══ 账户信息 ═══")
-    print(f"  用户名: {user.get('user_name')}")
-    print(f"  用户ID: {user.get('user_id')}")
-    print(f"  VIP:    {user.get('is_vip')}")
-
-    # 存储空间
-    print("\n═══ 存储空间 ═══")
-    space = client.fs_storage_info()
-    type_names = {'1': '主存储', '4': '备份存储'}
-    for type_id, sinfo in space.items():
-        name = type_names.get(type_id, f'类型{type_id}')
-        total = format_size(sinfo.get('total', 0))
-        used = format_size(sinfo.get('used', 0))
-        pct = sinfo.get('used', 0) / sinfo.get('total', 1) * 100 if sinfo.get('total') else 0
-        print(f"  {name}: {used} / {total} ({pct:.1f}%)")
+    # 用户信息和存储空间：SDK 失败时自动降级到直接 JSON 接口。
+    summary = load_basic_info(client=client)
+    print_basic_summary(summary)
 
     # 根目录预览
     print("\n═══ 根目录预览 ═══")
-    items = get_list_data(client.fs_files_aps({"cid": 0, "limit": 10}), "获取根目录预览")
-    for item in items:
-        print_item(item)
+    try:
+        response = client.fs_files_aps({"cid": 0, "limit": 10})
+        if isinstance(response, dict) and response.get("state") is False:
+            print(f"  ⚠️ 获取根目录预览失败: {response.get('error') or response.get('message') or response.get('errno')}")
+            if looks_like_login_error(response):
+                print(f"  {FILE_LOGIN_HINT}")
+        else:
+            items = get_list_data(response, "获取根目录预览")
+            for item in items:
+                print_item(item)
+    except Exception as exc:
+        print(f"  ⚠️ 获取根目录预览失败: {concise_error(exc)}")
+        if looks_like_login_error(exc):
+            print(f"  {FILE_LOGIN_HINT}")
 
     # 离线配额
     print("\n═══ 离线下载 ═══")
@@ -51,9 +56,9 @@ def main():
             quota = quota['data']
         print(f"  配额: {quota.get('quota', '?')} / {quota.get('total', '?')}")
     except Exception as e:
-        print(f"  ⚠️ 获取离线配额失败: {e}")
+        print(f"  ⚠️ 获取离线配额失败: {concise_error(e)}")
 
-    print("\n✅ 115 网盘连接正常!")
+    print("\n✅ 115 网盘基础信息读取完成!")
 
 
 if __name__ == '__main__':

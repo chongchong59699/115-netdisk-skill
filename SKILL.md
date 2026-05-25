@@ -282,7 +282,19 @@ with open("/path/to/cookies.txt") as f:
 client = P115Client(cookies, check_for_relogin=True)
 ```
 
-### 2. API 字段名是缩写
+### 2. p115client 0.0.8.4.9 默认解析可能误判 JSON 响应
+
+当前 skill 的 `scripts/lib.py` 会在导入 `p115client` 后修补 `default_parse`：使用响应首尾字节判断 JSON，避免 SDK 把普通 JSON 响应误当作加密内容解密后再解析，从而触发 `P115DataError` / `JSONDecodeError`。业务脚本应通过 `lib.get_client()` 初始化客户端，不要直接裸用 `P115Client(...)`。
+
+### 3. tv cookies 与 web 文件接口登录态可能不通
+
+默认扫码登录 app 仍为 `tv`，可用于扫码和部分账户/离线接口；目录浏览、搜索或存储接口如果返回“请先登录”“登录超时”“请重新登录”，请重新执行：
+
+```bash
+python scripts/login.py --app web --no-open
+```
+
+### 4. API 字段名是缩写
 
 | 字段 | 含义 | 常见错误 |
 |------|------|----------|
@@ -294,7 +306,7 @@ client = P115Client(cookies, check_for_relogin=True)
 | `pc` | pick code (下载用) | ❌ `pick_code` |
 | `t` | 修改时间 (unix) | ❌ `mtime` |
 
-### 3. Web API 在服务器上返回 405
+### 5. Web API 在服务器上返回 405
 
 `fs_files()` 从服务器 IP 调用会被拦截。**必须用 `fs_files_aps()`**，参数相同：
 
@@ -306,7 +318,7 @@ result = client.fs_files({"cid": dir_id, "limit": 100})
 result = client.fs_files_aps({"cid": dir_id, "limit": 100})
 ```
 
-### 4. 响应结构
+### 6. 响应结构
 
 ```python
 {
