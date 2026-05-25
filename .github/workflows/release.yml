@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-cookie-helper:
+    name: build ${{ matrix.goos }} ${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            suffix: .exe
+          - goos: darwin
+            goarch: amd64
+            suffix: ""
+          - goos: darwin
+            goarch: arm64
+            suffix: ""
+          - goos: linux
+            goarch: amd64
+            suffix: ""
+          - goos: linux
+            goarch: arm64
+            suffix: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p release
+          go build -trimpath -ldflags="-s -w" \
+            -o "release/115-cookie-helper-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}" \
+            ./cmd/115-cookie-helper
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 115-cookie-helper-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: release/*
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-cookie-helper
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*

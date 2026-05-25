@@ -1,0 +1,7 @@
+interface:
+  display_name: "115 Netdisk"
+  short_description: "Scan login, browse 115 files, and manage offline tasks"
+  default_prompt: "Use $115-netdisk to scan login to 115 Netdisk and save cookies."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,35 @@
+# IDE / local tooling
+.idea/
+.vscode/
+.codex/
+
+# Logs
+*.log
+logs/
+115-login-qrcode-*.png
+
+# Local credentials / runtime state
+.115-cookies
+*.cookies
+cookies.txt
+PROJECT_MEMORY.md
+
+# Archives / packages
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z
+*.exe
+*.msi
+*.dmg
+*.AppImage
+dist/
+build/
+release/
+node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
