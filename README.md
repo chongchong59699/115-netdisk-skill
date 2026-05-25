@@ -9,7 +9,7 @@
 你可以把下面这行发给 AI 智能体，让它先读取 `SKILL.md` 中的安装说明：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/SKILL.md
+curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/SKILL.md   请安装这个skill和基础环境
 ```
 
 
