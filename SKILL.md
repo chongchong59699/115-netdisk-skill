@@ -12,19 +12,19 @@ description: 115 网盘集成，支持 115扫码登录/115扫码登陆、二维�
 推荐安装方式：使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill。安装器只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/install.py | python - --repo OWNER/115-netdisk-skill --branch main
+curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
 ```
 
 Windows 如果 `python` 命令不可用，优先尝试：
 
 ```powershell
-curl.exe -fsSL https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/install.py | py - --repo OWNER/115-netdisk-skill --branch main
+curl.exe -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | py - --repo chongchong59699/115-netdisk-skill --branch master
 ```
 
 如果用户只提供了 GitHub 上的 `SKILL.md` URL，也可以把 URL 传给安装器，安装器会反推出仓库和分支：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/install.py | python - --skill-url https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/SKILL.md
+curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --skill-url https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/SKILL.md
 ```
 
 如果用户提供的是 `curl -fsSL https://.../SKILL.md` 这类自定义域名，先读取该 `SKILL.md` 正文；若正文没有给出 GitHub 仓库或安装器 URL，先询问仓库地址。
@@ -33,9 +33,9 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/instal
 
 1. 优先使用上面的 `install.py` 一行安装。
 2. 如果只能手工安装，从用户提供的 URL 推导 GitHub 仓库地址。常见格式：
-   - `https://raw.githubusercontent.com/<OWNER>/<REPO>/<BRANCH>/SKILL.md`
-   - `https://github.com/<OWNER>/<REPO>/blob/<BRANCH>/SKILL.md`
-   - 兼容旧结构：`https://raw.githubusercontent.com/<OWNER>/<REPO>/<BRANCH>/115-netdisk/SKILL.md`
+   - `https://raw.githubusercontent.com/<chongchong59699>/<REPO>/<BRANCH>/SKILL.md`
+   - `https://github.com/<chongchong59699>/<REPO>/blob/<BRANCH>/SKILL.md`
+   - 兼容旧结构：`https://raw.githubusercontent.com/<chongchong59699>/<REPO>/<BRANCH>/115-netdisk/SKILL.md`
    - 如果仓库 URL 无法从用户请求或 `SKILL.md` URL 推导出来，先向用户询问仓库地址，不要只安装单个 `SKILL.md` 文件。
 3. 将仓库根目录中的 skill 文件集复制到 Codex skills 目录：
    - 优先使用 `$CODEX_HOME/skills`
@@ -44,12 +44,12 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/115-netdisk-skill/main/instal
 4. 如果机器有 Python 3.12+，安装依赖：`python -m pip install p115client`；扫码登录脚本 `scripts/login.py` 只依赖 Python 标准库，不要求 Python 3.12。
 5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果当前 Python 低于 3.12，只需告知用户网盘功能脚本需要 Python 3.12+，扫码登录仍可用。
 
-PowerShell 7 示例，替换 `OWNER`、`REPO`、`BRANCH` 后执行：
+PowerShell 7 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
 
 ```powershell
-$owner = "OWNER"
+$owner = "chongchong59699"
 $repo = "REPO"
-$branch = "main"
+$branch = "master"
 $targetRoot = if ($env:CODEX_HOME) { Join-Path $env:CODEX_HOME "skills" } else { Join-Path $HOME ".codex\skills" }
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) "115-netdisk-skill-$([guid]::NewGuid())"
 git clone --depth 1 --branch $branch "https://github.com/$owner/$repo.git" $tmp
@@ -64,12 +64,12 @@ Copy-Item -LiteralPath (Join-Path $tmp "scripts") -Destination $targetSkill -Rec
 Remove-Item -LiteralPath $tmp -Recurse -Force
 ```
 
-POSIX shell 示例，替换 `OWNER`、`REPO`、`BRANCH` 后执行：
+POSIX shell 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
 
 ```bash
-owner="OWNER"
+owner="chongchong59699"
 repo="REPO"
-branch="main"
+branch="master"
 target_root="${CODEX_HOME:-$HOME/.codex}/skills"
 tmp="$(mktemp -d)"
 git clone --depth 1 --branch "$branch" "https://github.com/$owner/$repo.git" "$tmp"
