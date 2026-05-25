@@ -4,12 +4,18 @@
 提供客户端初始化、格式化等公共函数。
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Union
 
 MIN_PYTHON = (3, 12)
 COOKIES_PATH = Path("~/.115-cookies").expanduser()
+SCRIPT_DIR = Path(__file__).resolve().parent
+SKILL_DIR = SCRIPT_DIR.parent
+VENV_DIR = SKILL_DIR / ".venv"
+VENV_PYTHON = VENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+REEXEC_ENV = "P115_SKILL_VENV_REEXEC"
 
 for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
@@ -20,6 +26,23 @@ def fail(message: str, code: int = 1):
     """Print a user-facing error and exit with a non-zero status."""
     print(message, file=sys.stderr)
     sys.exit(code)
+
+
+def maybe_reexec_in_skill_venv():
+    """Run feature scripts with the skill-managed Python environment when present."""
+    if os.environ.get(REEXEC_ENV):
+        return
+    if not VENV_PYTHON.exists():
+        return
+    try:
+        current = Path(sys.executable).resolve()
+        managed = VENV_PYTHON.resolve()
+    except OSError:
+        return
+    if current == managed:
+        return
+    os.environ[REEXEC_ENV] = "1"
+    os.execv(str(managed), [str(managed), *sys.argv])
 
 
 def ensure_supported_python():
@@ -37,6 +60,7 @@ def ensure_supported_python():
 
 def import_p115client():
     """Import p115client with a clear remediation message for agents."""
+    maybe_reexec_in_skill_venv()
     ensure_supported_python()
     try:
         from p115client import P115Client
@@ -45,7 +69,8 @@ def import_p115client():
             raise
         fail(
             "❌ 缺少依赖: p115client\n"
-            "   请先在 Python 3.12+ 环境安装: python -m pip install p115client"
+            "   请重新运行 skill 安装器，它会创建 .venv 并安装 p115client。\n"
+            "   如果需要手工修复: python install.py --source-dir ."
         )
     return P115Client
 
@@ -101,6 +126,7 @@ def ensure_cookies_or_login(path: Path) -> bool:
 
 def get_client(cookies_path: Optional[Union[str, Path]] = None):
     """初始化 P115Client，并用路径传入 cookies 以便续期后写回文件。"""
+    maybe_reexec_in_skill_venv()
     path = resolve_cookies_path(cookies_path)
     logged_in = ensure_cookies_or_login(path)
     P115Client = import_p115client()

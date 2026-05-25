@@ -26,6 +26,7 @@ SKILL_MARKERS = (f"{SKILL_NAME}/SKILL.md", "SKILL.md")
 SKILL_FILE_NAMES = {"SKILL.md", "requirements.txt"}
 SKILL_DIR_NAMES = {"agents", "assets", "references", "scripts"}
 MIN_DEPENDENCY_PYTHON = (3, 12)
+VENV_DIR_NAME = ".venv"
 
 
 def fail(message: str, code: int = 1) -> None:
@@ -255,6 +256,110 @@ def find_dependency_python() -> Optional[Tuple[str, ...]]:
     return None
 
 
+def display_command(command: Tuple[str, ...]) -> str:
+    return " ".join(f'"{part}"' if " " in part else part for part in command)
+
+
+def venv_python_path(skill_dir: Path) -> Path:
+    if os.name == "nt":
+        return skill_dir / VENV_DIR_NAME / "Scripts" / "python.exe"
+    return skill_dir / VENV_DIR_NAME / "bin" / "python"
+
+
+def verify_p115client(python: Path) -> bool:
+    try:
+        subprocess.run(
+            [str(python), "-c", "import p115client"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
+def create_venv_with_python(python: Tuple[str, ...], skill_dir: Path, requirements: Path) -> Optional[Path]:
+    venv_dir = skill_dir / VENV_DIR_NAME
+    venv_python = venv_python_path(skill_dir)
+    print(f"Creating skill Python environment: {venv_dir}")
+    try:
+        subprocess.run([*python, "-m", "venv", str(venv_dir)], check=True)
+        subprocess.run([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], check=True)
+        subprocess.run([str(venv_python), "-m", "pip", "install", "-r", str(requirements)], check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Warning: failed to create/install skill Python environment with {display_command(python)}: {exc}")
+        return None
+    if not verify_p115client(venv_python):
+        print(f"Warning: p115client verification failed in {venv_python}")
+        return None
+    print(f"Installed p115client into skill environment: {venv_python}")
+    return venv_python
+
+
+def uv_candidates() -> list[Tuple[str, ...]]:
+    candidates: list[Tuple[str, ...]] = [("uv",), (sys.executable, "-m", "uv")]
+    seen = set()
+    unique = []
+    for command in candidates:
+        if command in seen:
+            continue
+        seen.add(command)
+        unique.append(command)
+    return unique
+
+
+def command_works(command: Tuple[str, ...], *args: str) -> bool:
+    try:
+        subprocess.run([*command, *args], check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
+def find_uv() -> Optional[Tuple[str, ...]]:
+    for command in uv_candidates():
+        if command_works(command, "--version"):
+            return command
+    return None
+
+
+def ensure_uv(allow_bootstrap: bool) -> Optional[Tuple[str, ...]]:
+    uv = find_uv()
+    if uv:
+        return uv
+    if not allow_bootstrap:
+        return None
+    print("Python 3.12+ was not found; installing uv with the current Python to bootstrap one...")
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "--user", "uv"], check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Warning: failed to bootstrap uv automatically: {exc}")
+        return None
+    return find_uv()
+
+
+def create_venv_with_uv(
+    uv: Tuple[str, ...],
+    skill_dir: Path,
+    requirements: Path,
+) -> Optional[Path]:
+    venv_dir = skill_dir / VENV_DIR_NAME
+    venv_python = venv_python_path(skill_dir)
+    print(f"Creating skill Python 3.12 environment with uv: {venv_dir}")
+    try:
+        subprocess.run([*uv, "venv", "--python", "3.12", str(venv_dir)], check=True)
+        subprocess.run([*uv, "pip", "install", "--python", str(venv_python), "-r", str(requirements)], check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Warning: failed to create/install skill environment with uv: {exc}")
+        return None
+    if not verify_p115client(venv_python):
+        print(f"Warning: p115client verification failed in {venv_python}")
+        return None
+    print(f"Installed p115client into skill environment: {venv_python}")
+    return venv_python
+
+
 def install_dependencies(skill_dir: Path, skip_deps: bool) -> None:
     if skip_deps:
         print("Skipped Python dependency installation because --no-deps was set.")
@@ -267,25 +372,19 @@ def install_dependencies(skill_dir: Path, skip_deps: bool) -> None:
 
     python = find_dependency_python()
     required = ".".join(map(str, MIN_DEPENDENCY_PYTHON))
-    if not python:
-        print(
-            f"Warning: Python {required}+ was not found; skipped p115client installation.\n"
-            "QR login still works with the system Python because scripts/login.py uses only the standard library.\n"
-            "Install Python 3.12+ and run: python -m pip install -r "
-            f"\"{requirements}\""
-        )
+    if python and create_venv_with_python(python, skill_dir, requirements):
         return
 
-    display_command = " ".join(f'"{part}"' if " " in part else part for part in python)
-    print(f"Installing Python dependencies with {display_command}: {requirements}")
-    try:
-        subprocess.run([*python, "-m", "pip", "install", "-r", str(requirements)], check=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        print(
-            "Warning: failed to install Python dependencies automatically.\n"
-            f"Reason: {exc}\n"
-            f"Run manually with Python {required}+: python -m pip install -r \"{requirements}\""
-        )
+    uv = ensure_uv(allow_bootstrap=True)
+    if uv and create_venv_with_uv(uv, skill_dir, requirements):
+        return
+
+    print(
+        f"Warning: could not install p115client automatically because Python {required}+ "
+        "and uv bootstrap were unavailable or failed.\n"
+        "QR login still works with the system Python because scripts/login.py uses only the standard library.\n"
+        "Install Python 3.12+ or uv, then rerun this installer."
+    )
 
 
 def compile_scripts(skill_dir: Path) -> None:

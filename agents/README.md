@@ -18,3 +18,5 @@ Recommended behavior:
 4. Treat transient `[status=?]` messages as network retries, not login failure.
 
 Plain shell output containing `QR_MARKDOWN` is not enough by itself; the agent must actively render, attach, open, or relay the QR target.
+
+Installers should run the repository `install.py`, not copy only `SKILL.md`. The installer creates a skill-local `.venv` and installs `p115client` there; feature scripts automatically switch into that environment when it exists.

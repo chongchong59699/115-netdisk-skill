@@ -21,7 +21,7 @@ description: 115 网盘集成，支持 115扫码登录/115扫码登陆、二维�
 
 所有 agent 在运行 `scripts/login.py --no-open` 或 release 二进制后，应监听 stdout；一旦看到上述任意二维码标记，就立即用自己支持的方式展示、打开或转述给用户，并保持进程继续运行等待用户扫码确认。单纯在 shell 输出里打印 `QR_MARKDOWN` 不等于已经把图片展示给用户。
 
-推荐安装方式：使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后如果能找到 Python 3.12+，会自动执行 `pip install -r requirements.txt` 安装 `p115client`。
+推荐安装方式：必须使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill，不要只保存 `SKILL.md`。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后会在目标用户的 skill 目录内创建私有 `.venv` 并安装 `p115client`。如果目标用户环境没有 Python 3.12+，安装器会尝试先安装/使用 `uv` 拉起 Python 3.12 环境，不要求用户手工安装到系统 Python。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
@@ -33,7 +33,7 @@ Windows 如果 `python` 命令不可用，优先尝试：
 curl.exe -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | py - --repo chongchong59699/115-netdisk-skill --branch master
 ```
 
-如果用户只想复制 skill 文件、跳过依赖安装，可给安装器追加 `--no-deps`。
+如果用户只想复制 skill 文件、跳过依赖安装，可给安装器追加 `--no-deps`。除非用户明确要求，否则不要加这个参数，因为会导致扫码后无法立即浏览网盘或读取账户信息。
 
 如果用户只提供了 GitHub 上的 `SKILL.md` URL，也可以把 URL 传给安装器，安装器会反推出仓库和分支：
 
@@ -55,8 +55,8 @@ curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/m
    - 优先使用 `$CODEX_HOME/skills`
    - 未设置时使用 `~/.codex/skills`
    - 最终目录应为 `~/.codex/skills/115-netdisk/SKILL.md`
-4. 安装器会自动寻找 Python 3.12+ 并安装 `requirements.txt`；扫码登录脚本 `scripts/login.py` 只依赖 Python 标准库，不要求 Python 3.12。如果未找到 Python 3.12+，安装器会跳过依赖安装并给出明确提示。
-5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果当前 Python 低于 3.12，只需告知用户网盘功能脚本需要 Python 3.12+，扫码登录仍可用。
+4. 安装器会自动创建 `115-netdisk/.venv` 并安装 `requirements.txt`；优先使用系统 Python 3.12+，没有时尝试通过 `uv` 自举 Python 3.12。业务脚本会自动切换到这个私有 `.venv`，agent 不需要记住解释器路径。
+5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果依赖安装失败，必须在安装阶段明确告知用户，而不是等扫码后才说缺少 `p115client`。
 
 PowerShell 7 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
 

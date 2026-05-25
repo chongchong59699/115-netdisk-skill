@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -40,6 +41,9 @@ VALID_APPS = {
     "qandroid",
 }
 PREFERRED_COOKIE_KEYS = ("UID", "CID", "SEID", "KID")
+SCRIPT_DIR = Path(__file__).resolve().parent
+SKILL_DIR = SCRIPT_DIR.parent
+VENV_PYTHON = SKILL_DIR / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
@@ -242,13 +246,57 @@ def print_capabilities() -> None:
     print("  - 查看离线任务、离线配额和离线下载目录")
 
 
+def try_print_account_info_with_venv(cookies: str) -> bool:
+    if not VENV_PYTHON.exists():
+        return False
+    try:
+        if Path(sys.executable).resolve() == VENV_PYTHON.resolve():
+            return False
+    except OSError:
+        return False
+
+    code = r"""
+import sys
+from p115client import P115Client
+
+cookies = sys.stdin.read().strip()
+client = P115Client(cookies, check_for_relogin=True)
+info = client.user_info()
+if isinstance(info, dict) and info.get("state") is False:
+    raise RuntimeError(info)
+user = info.get("data", {}) if isinstance(info, dict) else {}
+print("\n═══ 账户信息 ═══")
+print(f"  用户名: {user.get('user_name')}")
+print(f"  用户ID: {user.get('user_id')}")
+print(f"  VIP:    {user.get('is_vip')}")
+"""
+    try:
+        completed = subprocess.run(
+            [str(VENV_PYTHON), "-c", code],
+            input=cookies,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = exc.stderr.strip() if isinstance(exc, subprocess.CalledProcessError) and exc.stderr else exc
+        print(f"\n扫码登录已完成，但使用 skill 私有 Python 读取账户信息失败：{detail}")
+        return False
+    print(completed.stdout, end="")
+    return True
+
+
 def try_print_account_info(cookies: str) -> None:
+    if try_print_account_info_with_venv(cookies):
+        print_capabilities()
+        return
+
     try:
         from p115client import P115Client
     except Exception as exc:
         print("\n已完成扫码登录，但当前 Python 环境暂不能读取账户详情。")
         print(f"原因：{exc}")
-        print("安装依赖后可运行：python -m pip install p115client")
+        print("请重新运行 skill 安装器，它会创建 .venv 并安装 p115client。")
         print_capabilities()
         return
 
