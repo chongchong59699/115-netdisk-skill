@@ -94,6 +94,9 @@ def patch_p115client_default_parse() -> None:
         import p115client.client as client_mod
     except Exception:
         return
+    # 新版 p115client 已重构解析逻辑并移除了 default_parse，上游修复了此 bug，无需再补丁。
+    if not hasattr(client_mod, "default_parse"):
+        return
     if getattr(client_mod.default_parse, "_p115_skill_patched", False):
         return
 
@@ -177,7 +180,7 @@ def get_client(cookies_path: Optional[Union[str, Path]] = None):
     logged_in = ensure_cookies_or_login(path)
     P115Client = import_p115client()
     cookies = load_cookies(path)
-    client = P115Client(path, check_for_relogin=True)
+    client = P115Client(path)
     configure_client(client, cookies)
     if logged_in:
         print_client_summary(client)
@@ -188,7 +191,7 @@ def get_client(cookies_path: Optional[Union[str, Path]] = None):
 def get_client_from_cookies(cookies: str):
     """Create a configured client from an in-memory cookie string."""
     P115Client = import_p115client()
-    return configure_client(P115Client(cookies, check_for_relogin=True), cookies)
+    return configure_client(P115Client(cookies), cookies)
 
 
 def concise_error(exc: BaseException, limit: int = 300) -> str:

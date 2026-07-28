@@ -263,7 +263,7 @@ uv pip install --python /path/to/python3.12 p115client
 - **标准路径：** `~/.115-cookies`（即 `/root/.115-cookies` 或 `/home/<user>/.115-cookies`）
 - **格式：** 纯文本，单行，格式为 `UID=xxx; CID=xxx; SEID=xxx; KID=xxx`
 - **权限：** 建议 `chmod 600` 仅本人可读写
-- **过期：** Cookies 有有效期，过期后需用户重新从浏览器获取。脚本用 `Path` 对象初始化 `P115Client(..., check_for_relogin=True)`，如果 SDK 自动续期成功，会尝试写回 cookies 文件。
+- **过期：** Cookies 有有效期，过期后需用户重新扫码或从浏览器获取。脚本用 `Path` 对象初始化 `P115Client(Path(...))`（新版 p115client 已移除 `check_for_relogin` 参数）。
 - **读取方式：** 普通字符串会被 p115client 当作 cookies 内容解析；如果要传文件路径，必须传 `pathlib.Path`/`os.PathLike`，或者先 `open().read()` 读取内容。
 
 ## ⚠️ 关键 Pitfalls
@@ -276,12 +276,12 @@ client = P115Client("/path/to/cookies.txt")
 
 # ✅ 正确：用 PathLike，续期后可写回文件
 from pathlib import Path
-client = P115Client(Path("/path/to/cookies.txt"), check_for_relogin=True)
+client = P115Client(Path("/path/to/cookies.txt"))
 
 # ✅ 也可以读取文件内容，但续期后的 cookies 不会自动写回这个文件
 with open("/path/to/cookies.txt") as f:
     cookies = f.read().strip()
-client = P115Client(cookies, check_for_relogin=True)
+client = P115Client(cookies)
 ```
 
 ### 2. p115client 0.0.8.4.9 默认解析可能误判 JSON 响应
@@ -339,7 +339,7 @@ from p115client import P115Client
 
 # 初始化
 with open(os.path.expanduser("~/.115-cookies")) as f:
-    client = P115Client(f.read().strip(), check_for_relogin=True)
+    client = P115Client(f.read().strip())
 
 # 用户信息
 info = client.user_info()  # info['data']['user_name'], info['data']['is_vip']
@@ -356,17 +356,17 @@ result = client.fs_search({"search_value": "关键词", "limit": 50})
 # 获取下载链接
 url = client.download_url({"pick_code": "xxx"})
 
-# 离线下载（磁力/ed2k/HTTP）
-client.offline_add_url({"url": "magnet:?xt=urn:btih:xxx"})
+# 离线下载（磁力/ed2k/HTTP）——新版 p115client 方法名为 clouddownload_task_*
+client.clouddownload_task_add_url({"url": "magnet:?xt=urn:btih:xxx"})
 
 # 指定保存相对目录用 savepath；指定目录 ID 用 wp_path_id
-client.offline_add_url({"url": "https://example.com/file.zip", "savepath": "downloads"})
+client.clouddownload_task_add_url({"url": "https://example.com/file.zip", "savepath": "downloads"})
 
-# 离线任务列表
-tasks = client.offline_list()  # tasks['quota'], tasks['tasks']
+# 离线任务列表（payload 可传页码 int 或 {page, page_size, stat}）
+tasks = client.clouddownload_task_list()  # tasks['quota'], tasks['total'], tasks['count'], tasks['tasks']
 
-# 离线配额
-quota = client.offline_quota_info()  # quota['quota'], quota['total']
+# 离线下载目录
+paths = client.clouddownload_downpath()  # paths['data'] = [{file_id, file_name, is_selected}, ...]
 
 # 创建文件夹
 client.fs_mkdir({"cname": "新文件夹", "pid": 0})

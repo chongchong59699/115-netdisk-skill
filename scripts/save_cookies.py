@@ -35,7 +35,7 @@ def test_connection(cookies: str) -> bool:
     """测试 cookies 是否能正常连接 115。"""
     try:
         P115Client = import_p115client()
-        client = P115Client(cookies, check_for_relogin=True)
+        client = P115Client(cookies)
         info = require_success(client.user_info(), "验证 Cookies")
 
         user = info.get('data', {})

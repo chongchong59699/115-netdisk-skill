@@ -51,10 +51,9 @@ def main():
     # 离线配额
     print("\n═══ 离线下载 ═══")
     try:
-        quota = require_success(client.offline_quota_info(), "获取离线配额")
-        if isinstance(quota.get('data'), dict):
-            quota = quota['data']
-        print(f"  配额: {quota.get('quota', '?')} / {quota.get('total', '?')}")
+        tasks = client.clouddownload_task_list()
+        print(f"  配额: {tasks.get('quota', '?')} / {tasks.get('total', '?')}")
+        print(f"  任务数: {tasks.get('count', '?')}")
     except Exception as e:
         print(f"  ⚠️ 获取离线配额失败: {concise_error(e)}")
 
