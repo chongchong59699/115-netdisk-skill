@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import (
     FILE_LOGIN_HINT,
+    client_method,
     concise_error,
     get_client,
     get_list_data,
@@ -51,7 +52,10 @@ def main():
     # 离线配额
     print("\n═══ 离线下载 ═══")
     try:
-        quota = require_success(client.offline_quota_info(), "获取离线配额")
+        try:
+            quota = require_success(client_method(client, "offline_quota_info")(), "获取离线配额")
+        except Exception:
+            quota = require_success(client_method(client, "offline_list")(), "获取离线配额")
         if isinstance(quota.get('data'), dict):
             quota = quota['data']
         print(f"  配额: {quota.get('quota', '?')} / {quota.get('total', '?')}")

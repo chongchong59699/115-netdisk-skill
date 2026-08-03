@@ -15,7 +15,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import fail, format_size, get_client, require_success
+from lib import client_method, fail, format_size, get_client, require_success
 
 
 def response_payload(response: dict, action: str) -> dict:
@@ -31,7 +31,7 @@ def add_download(client, url: str, save_path: str = None):
     if save_path:
         params["savepath"] = save_path
 
-    result = client.offline_add_url(params)
+    result = client_method(client, "offline_add_url")(params)
     require_success(result, "添加离线下载")
     print("✅ 下载任务已添加!")
     task = result.get('result') or result.get('data') or {}
@@ -43,7 +43,7 @@ def add_download(client, url: str, save_path: str = None):
 
 def list_tasks(client):
     """列出离线下载任务。"""
-    tasks = response_payload(client.offline_list(), "获取离线任务")
+    tasks = response_payload(client_method(client, "offline_list")(), "获取离线任务")
     count = tasks.get('count', tasks.get('total_count', tasks.get('total', 0)))
     quota = tasks.get('quota', '?')
     total = tasks.get('total', tasks.get('quota_total', '?'))
@@ -69,15 +69,25 @@ def list_tasks(client):
         print(f"  {status_icon} {name} ({size}) - {pct}%")
 
 
+def read_quota(client) -> dict:
+    """Read offline quota, falling back to the task list on newer SDKs."""
+    try:
+        return response_payload(client_method(client, "offline_quota_info")(), "获取离线配额")
+    except SystemExit:
+        raise
+    except Exception:
+        return response_payload(client_method(client, "offline_list")(), "获取离线配额")
+
+
 def show_quota(client):
     """显示离线配额。"""
-    quota = response_payload(client.offline_quota_info(), "获取离线配额")
+    quota = read_quota(client)
     print(f"📊 离线下载配额: {quota.get('quota', '?')} / {quota.get('total', '?')}")
 
 
 def show_paths(client):
     """显示离线下载目录配置。"""
-    paths = require_success(client.offline_download_path(), "获取离线下载目录")
+    paths = require_success(client_method(client, "offline_download_path")(), "获取离线下载目录")
     dirs = paths.get('data', [])
     if isinstance(dirs, dict):
         dirs = dirs.get('list') or dirs.get('paths') or []

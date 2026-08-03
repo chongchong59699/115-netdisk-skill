@@ -94,7 +94,10 @@ def patch_p115client_default_parse() -> None:
         import p115client.client as client_mod
     except Exception:
         return
-    if getattr(client_mod.default_parse, "_p115_skill_patched", False):
+    original_parse = getattr(client_mod, "default_parse", None)
+    if original_parse is None:
+        return
+    if getattr(original_parse, "_p115_skill_patched", False):
         return
 
     def fixed_default_parse(_, content):
@@ -110,6 +113,39 @@ def patch_p115client_default_parse() -> None:
 
     fixed_default_parse._p115_skill_patched = True
     client_mod.default_parse = fixed_default_parse
+
+
+def new_client(P115Client, cookies):
+    """Build a P115Client across SDK versions with/without check_for_relogin."""
+    import inspect
+
+    if "check_for_relogin" in inspect.signature(P115Client.__init__).parameters:
+        return P115Client(cookies, check_for_relogin=True)
+    return P115Client(cookies)
+
+
+# Legacy p115client 0.0.8.x method names mapped to their 0.0.9.x replacements.
+CLIENT_METHOD_ALIASES = {
+    "offline_add_url": ("offline_add_url", "clouddownload_task_add_url"),
+    "offline_add_urls": ("offline_add_urls", "clouddownload_task_add_urls"),
+    "offline_list": ("offline_list", "clouddownload_task_list"),
+    "offline_quota_info": ("offline_quota_info", "clouddownload_quota_info"),
+    "offline_download_path": ("offline_download_path", "clouddownload_downpath"),
+    "offline_remove": ("offline_remove", "clouddownload_task_del"),
+    "offline_clear": ("offline_clear", "clouddownload_task_clear"),
+}
+
+
+def client_method(client: Any, name: str):
+    """Resolve an API method across p115client versions that renamed it."""
+    for candidate in CLIENT_METHOD_ALIASES.get(name, (name,)):
+        method = getattr(client, candidate, None)
+        if callable(method):
+            return method
+    fail(
+        f"❌ 当前 p115client 版本不支持接口: {name}\n"
+        "   请更新本 skill 的接口映射（scripts/lib.py: CLIENT_METHOD_ALIASES）。"
+    )
 
 
 def configure_client(client: Any, cookies: str) -> Any:
@@ -177,7 +213,7 @@ def get_client(cookies_path: Optional[Union[str, Path]] = None):
     logged_in = ensure_cookies_or_login(path)
     P115Client = import_p115client()
     cookies = load_cookies(path)
-    client = P115Client(path, check_for_relogin=True)
+    client = new_client(P115Client, path)
     configure_client(client, cookies)
     if logged_in:
         print_client_summary(client)
@@ -188,7 +224,7 @@ def get_client(cookies_path: Optional[Union[str, Path]] = None):
 def get_client_from_cookies(cookies: str):
     """Create a configured client from an in-memory cookie string."""
     P115Client = import_p115client()
-    return configure_client(P115Client(cookies, check_for_relogin=True), cookies)
+    return configure_client(new_client(P115Client, cookies), cookies)
 
 
 def concise_error(exc: BaseException, limit: int = 300) -> str:

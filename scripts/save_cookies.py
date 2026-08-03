@@ -17,7 +17,7 @@ import sys
 
 # 加入脚本所在目录到 path，方便引用 lib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import COOKIES_PATH, format_size, import_p115client, load_cookies, require_success
+from lib import COOKIES_PATH, format_size, import_p115client, load_cookies, new_client, require_success
 
 REQUIRED_FIELDS = ['UID', 'CID', 'SEID', 'KID']
 
@@ -35,7 +35,7 @@ def test_connection(cookies: str) -> bool:
     """测试 cookies 是否能正常连接 115。"""
     try:
         P115Client = import_p115client()
-        client = P115Client(cookies, check_for_relogin=True)
+        client = new_client(P115Client, cookies)
         info = require_success(client.user_info(), "验证 Cookies")
 
         user = info.get('data', {})
