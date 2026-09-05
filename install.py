@@ -25,7 +25,7 @@ SKILL_NAME = "115-netdisk"
 SKILL_MARKERS = (f"{SKILL_NAME}/SKILL.md", "SKILL.md")
 SKILL_FILE_NAMES = {"SKILL.md", "requirements.txt"}
 SKILL_DIR_NAMES = {"agents", "assets", "references", "scripts"}
-MIN_DEPENDENCY_PYTHON = (3, 12)
+REQUIRED_DEPENDENCY_PYTHON = (3, 12)
 VENV_DIR_NAME = ".venv"
 
 
@@ -233,9 +233,9 @@ def python_version(command: Tuple[str, ...]) -> Optional[Tuple[int, int, int]]:
 def dependency_python_candidates() -> list[Tuple[str, ...]]:
     commands: list[Tuple[str, ...]] = [(sys.executable,)]
     if os.name == "nt":
-        commands.extend([("py", "-3.14"), ("py", "-3.13"), ("py", "-3.12")])
+        commands.append(("py", "-3.12"))
     else:
-        commands.extend([("python3.14",), ("python3.13",), ("python3.12",), ("python3",), ("python",)])
+        commands.extend([("python3.12",), ("python3",), ("python",)])
 
     seen = set()
     unique = []
@@ -251,7 +251,7 @@ def dependency_python_candidates() -> list[Tuple[str, ...]]:
 def find_dependency_python() -> Optional[Tuple[str, ...]]:
     for command in dependency_python_candidates():
         version = python_version(command)
-        if version and version >= MIN_DEPENDENCY_PYTHON:
+        if version == REQUIRED_DEPENDENCY_PYTHON:
             return command
     return None
 
@@ -330,7 +330,7 @@ def ensure_uv(allow_bootstrap: bool) -> Optional[Tuple[str, ...]]:
         return uv
     if not allow_bootstrap:
         return None
-    print("Python 3.12+ was not found; installing uv with the current Python to bootstrap one...")
+    print("Python 3.12 was not found; installing uv with the current Python to bootstrap one...")
     try:
         subprocess.run([sys.executable, "-m", "pip", "install", "--user", "uv"], check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
@@ -371,7 +371,7 @@ def install_dependencies(skill_dir: Path, skip_deps: bool) -> None:
         return
 
     python = find_dependency_python()
-    required = ".".join(map(str, MIN_DEPENDENCY_PYTHON))
+    required = ".".join(map(str, REQUIRED_DEPENDENCY_PYTHON))
     if python and create_venv_with_python(python, skill_dir, requirements):
         return
 
@@ -380,10 +380,10 @@ def install_dependencies(skill_dir: Path, skip_deps: bool) -> None:
         return
 
     print(
-        f"Warning: could not install p115client automatically because Python {required}+ "
+        f"Warning: could not install p115client automatically because Python {required} "
         "and uv bootstrap were unavailable or failed.\n"
         "QR login still works with the system Python because scripts/login.py uses only the standard library.\n"
-        "Install Python 3.12+ or uv, then rerun this installer."
+        "Install Python 3.12 or uv, then rerun this installer."
     )
 
 

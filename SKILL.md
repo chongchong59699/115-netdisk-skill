@@ -23,7 +23,7 @@ description: 115 网盘集成，支持 115扫码登录/115扫码登陆、二维�
 
 对 Codex 这类通过工具执行命令的 agent，扫码登录属于长轮询任务，不能一直阻塞等待命令结束后才回复用户。应使用短暂等待启动命令（例如 `yield_time_ms: 1000`），读取首批 stdout；如果看到二维码标记，立刻在普通聊天消息中发送本地图片 Markdown（Codex 桌面端必须使用绝对路径），例如 `![115 登录二维码](C:\...\115-login-qrcode-xxx.png)`，然后再继续轮询后台进程直到登录成功或失败。如果首批输出还没有二维码标记，应继续读取进程输出，直到拿到二维码再展示。`--timeout 0` 只表示脚本不主动超时，115 的二维码 key 仍可能过期；通常保留默认超时即可。
 
-推荐安装方式：必须使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill，不要只保存 `SKILL.md`。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后会在目标用户的 skill 目录内创建私有 `.venv` 并安装 `p115client`。如果目标用户环境没有 Python 3.12+，安装器会尝试先安装/使用 `uv` 拉起 Python 3.12 环境，不要求用户手工安装到系统 Python。
+推荐安装方式：必须使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill，不要只保存 `SKILL.md`。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后会在目标用户的 skill 目录内创建私有 `.venv` 并安装固定依赖。如果目标用户环境没有 Python 3.12，安装器会尝试先安装/使用 `uv` 拉起 Python 3.12 环境，不要求用户手工安装到系统 Python。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/m
    - 优先使用 `$CODEX_HOME/skills`
    - 未设置时使用 `~/.codex/skills`
    - 最终目录应为 `~/.codex/skills/115-netdisk/SKILL.md`
-4. 安装器会自动创建 `115-netdisk/.venv` 并安装 `requirements.txt`；优先使用系统 Python 3.12+，没有时尝试通过 `uv` 自举 Python 3.12。业务脚本会自动切换到这个私有 `.venv`，agent 不需要记住解释器路径。
+4. 安装器会自动创建 `115-netdisk/.venv` 并安装固定版本的 `requirements.txt`；优先使用 Python 3.12，没有时尝试通过 `uv` 自举 Python 3.12。业务脚本会自动切换到这个私有 `.venv`，agent 不需要记住解释器路径。
 5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果依赖安装失败，必须在安装阶段明确告知用户，而不是等扫码后才说缺少 `p115client`。
 
 PowerShell 7 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
@@ -250,12 +250,12 @@ python3 scripts/offline_download.py --list
 
 ## 安装依赖
 
-p115client 当前要求 Python 3.12+：
+p115client 当前固定在 Python 3.12 环境：
 
 ```bash
-python3.12 -m pip install p115client
+python3.12 -m pip install -r requirements.txt
 # 或指定 Python 路径
-uv pip install --python /path/to/python3.12 p115client
+uv pip install --python /path/to/python3.12 -r requirements.txt
 ```
 
 ## Cookies 持久化说明
@@ -263,7 +263,7 @@ uv pip install --python /path/to/python3.12 p115client
 - **标准路径：** `~/.115-cookies`（即 `/root/.115-cookies` 或 `/home/<user>/.115-cookies`）
 - **格式：** 纯文本，单行，格式为 `UID=xxx; CID=xxx; SEID=xxx; KID=xxx`
 - **权限：** 建议 `chmod 600` 仅本人可读写
-- **过期：** Cookies 有有效期，过期后需用户重新从浏览器获取。脚本用 `Path` 对象初始化 `P115Client(..., check_for_relogin=True)`，如果 SDK 自动续期成功，会尝试写回 cookies 文件。
+- **过期：** Cookies 有有效期，过期后需用户重新扫码或从浏览器获取。脚本用 `Path` 对象初始化 `P115Client(Path(...))`（新版 p115client 已移除 `check_for_relogin` 参数）。
 - **读取方式：** 普通字符串会被 p115client 当作 cookies 内容解析；如果要传文件路径，必须传 `pathlib.Path`/`os.PathLike`，或者先 `open().read()` 读取内容。
 
 ## ⚠️ 关键 Pitfalls
@@ -276,12 +276,12 @@ client = P115Client("/path/to/cookies.txt")
 
 # ✅ 正确：用 PathLike，续期后可写回文件
 from pathlib import Path
-client = P115Client(Path("/path/to/cookies.txt"), check_for_relogin=True)
+client = P115Client(Path("/path/to/cookies.txt"))
 
 # ✅ 也可以读取文件内容，但续期后的 cookies 不会自动写回这个文件
 with open("/path/to/cookies.txt") as f:
     cookies = f.read().strip()
-client = P115Client(cookies, check_for_relogin=True)
+client = P115Client(cookies)
 ```
 
 ### 2. p115client 0.0.8.4.9 默认解析可能误判 JSON 响应
@@ -339,7 +339,7 @@ from p115client import P115Client
 
 # 初始化
 with open(os.path.expanduser("~/.115-cookies")) as f:
-    client = P115Client(f.read().strip(), check_for_relogin=True)
+    client = P115Client(f.read().strip())
 
 # 用户信息
 info = client.user_info()  # info['data']['user_name'], info['data']['is_vip']
@@ -356,17 +356,17 @@ result = client.fs_search({"search_value": "关键词", "limit": 50})
 # 获取下载链接
 url = client.download_url({"pick_code": "xxx"})
 
-# 离线下载（磁力/ed2k/HTTP）
-client.offline_add_url({"url": "magnet:?xt=urn:btih:xxx"})
+# 离线下载（磁力/ed2k/HTTP）——新版 p115client 方法名为 clouddownload_task_*
+client.clouddownload_task_add_url({"url": "magnet:?xt=urn:btih:xxx"})
 
 # 指定保存相对目录用 savepath；指定目录 ID 用 wp_path_id
-client.offline_add_url({"url": "https://example.com/file.zip", "savepath": "downloads"})
+client.clouddownload_task_add_url({"url": "https://example.com/file.zip", "savepath": "downloads"})
 
-# 离线任务列表
-tasks = client.offline_list()  # tasks['quota'], tasks['tasks']
+# 离线任务列表（payload 可传页码 int 或 {page, page_size, stat}）
+tasks = client.clouddownload_task_list()  # tasks['quota'], tasks['total'], tasks['count'], tasks['tasks']
 
-# 离线配额
-quota = client.offline_quota_info()  # quota['quota'], quota['total']
+# 离线下载目录
+paths = client.clouddownload_downpath()  # paths['data'] = [{file_id, file_name, is_selected}, ...]
 
 # 创建文件夹
 client.fs_mkdir({"cname": "新文件夹", "pid": 0})
