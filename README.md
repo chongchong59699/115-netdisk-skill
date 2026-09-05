@@ -67,10 +67,23 @@ Copy-Item -LiteralPath ".\115-netdisk-skill\scripts" -Destination $targetSkill -
 手工安装 Python 依赖必须使用 Python 3.12：
 
 ```bash
-python3.12 -m pip install p115client
+python3.12 -m pip install -r requirements.txt
 ```
 
 正常不需要手工执行上面的命令。安装器创建 `.venv` 后，`scripts/browse.py`、`scripts/test_connection.py`、`scripts/offline_download.py` 会自动切换到该私有 Python 环境运行。
+
+## 版本与变更记录
+
+当前稳定基线固定为 Python 3.12 和 `p115client==0.0.9.6.5.1`，`requirements.txt` 同时锁定了全部传递依赖，避免新安装时因 PyPI 版本漂移导致行为变化。
+
+本次兼容性调整包括：
+
+- 适配 `p115client 0.0.9.x`，使用 `clouddownload_task_*` 云下载接口。
+- 跳过新版已移除的 `default_parse` 兼容补丁。
+- 更新离线任务状态、配额和下载目录读取逻辑。
+- 安装器固定使用 Python 3.12，并按锁定依赖创建私有虚拟环境。
+
+升级依赖或 SDK 前，应先在真实账号环境验证连接、目录、离线任务、配额和下载目录功能，再更新版本记录和发布 tag。
 
 ## Agent 兼容
 

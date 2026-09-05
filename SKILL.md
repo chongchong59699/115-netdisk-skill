@@ -253,9 +253,9 @@ python3 scripts/offline_download.py --list
 p115client 当前固定在 Python 3.12 环境：
 
 ```bash
-python3.12 -m pip install p115client
+python3.12 -m pip install -r requirements.txt
 # 或指定 Python 路径
-uv pip install --python /path/to/python3.12 p115client
+uv pip install --python /path/to/python3.12 -r requirements.txt
 ```
 
 ## Cookies 持久化说明
