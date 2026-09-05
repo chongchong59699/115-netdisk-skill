@@ -31,20 +31,23 @@ def add_download(client, url: str, save_path: str = None):
     if save_path:
         params["savepath"] = save_path
 
-    result = client.offline_add_url(params)
+    result = client.clouddownload_task_add_url(params)
     require_success(result, "添加离线下载")
     print("✅ 下载任务已添加!")
-    task = result.get('result') or result.get('data') or {}
+    task = result.get('data') or result.get('result') or {}
     if isinstance(task, dict):
         print(f"   文件: {task.get('name', task.get('file_name', '?'))}")
-        print(f"   大小: {format_size(task.get('size', task.get('file_size', 0)))}")
+        if task.get('info_hash'):
+            print(f"   哈希: {task['info_hash']}")
+        if task.get('size') or task.get('file_size'):
+            print(f"   大小: {format_size(task.get('size', task.get('file_size', 0)))}")
     return result
 
 
 def list_tasks(client):
     """列出离线下载任务。"""
-    tasks = response_payload(client.offline_list(), "获取离线任务")
-    count = tasks.get('count', tasks.get('total_count', tasks.get('total', 0)))
+    tasks = response_payload(client.clouddownload_task_list(), "获取离线任务")
+    count = tasks.get('count', tasks.get('total_count', 0))
     quota = tasks.get('quota', '?')
     total = tasks.get('total', tasks.get('quota_total', '?'))
 
@@ -62,22 +65,30 @@ def list_tasks(client):
     for t in task_list:
         name = t.get('name', t.get('file_name', '?'))
         size = format_size(t.get('size', t.get('file_size', 0)))
-        status = t.get('status', '?')
         pct = t.get('percentDone', t.get('progress', '?'))
+        dstatus = str(t.get('display_status', ''))
+        stext = str(t.get('status_text', ''))
 
-        status_icon = '✅' if status == 2 else '⏳' if status == 1 else '❌'
-        print(f"  {status_icon} {name} ({size}) - {pct}%")
+        if 'complet' in dstatus or '完成' in stext:
+            status_icon = '✅'
+        elif 'download' in dstatus or '下载中' in stext:
+            status_icon = '⏳'
+        elif 'fail' in dstatus or '失败' in stext:
+            status_icon = '❌'
+        else:
+            status_icon = '❔'
+        print(f"  {status_icon} {name} ({size}) - {pct}% [{stext or dstatus}]")
 
 
 def show_quota(client):
     """显示离线配额。"""
-    quota = response_payload(client.offline_quota_info(), "获取离线配额")
-    print(f"📊 离线下载配额: {quota.get('quota', '?')} / {quota.get('total', '?')}")
+    tasks = response_payload(client.clouddownload_task_list(), "获取离线配额")
+    print(f"📊 离线下载配额: {tasks.get('quota', '?')} / {tasks.get('total', '?')}")
 
 
 def show_paths(client):
     """显示离线下载目录配置。"""
-    paths = require_success(client.offline_download_path(), "获取离线下载目录")
+    paths = require_success(client.clouddownload_downpath(), "获取离线下载目录")
     dirs = paths.get('data', [])
     if isinstance(dirs, dict):
         dirs = dirs.get('list') or dirs.get('paths') or []
