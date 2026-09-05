@@ -23,7 +23,7 @@ description: 115 网盘集成，支持 115扫码登录/115扫码登陆、二维�
 
 对 Codex 这类通过工具执行命令的 agent，扫码登录属于长轮询任务，不能一直阻塞等待命令结束后才回复用户。应使用短暂等待启动命令（例如 `yield_time_ms: 1000`），读取首批 stdout；如果看到二维码标记，立刻在普通聊天消息中发送本地图片 Markdown（Codex 桌面端必须使用绝对路径），例如 `![115 登录二维码](C:\...\115-login-qrcode-xxx.png)`，然后再继续轮询后台进程直到登录成功或失败。如果首批输出还没有二维码标记，应继续读取进程输出，直到拿到二维码再展示。`--timeout 0` 只表示脚本不主动超时，115 的二维码 key 仍可能过期；通常保留默认超时即可。
 
-推荐安装方式：必须使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill，不要只保存 `SKILL.md`。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后会在目标用户的 skill 目录内创建私有 `.venv` 并安装 `p115client`。如果目标用户环境没有 Python 3.12+，安装器会尝试先安装/使用 `uv` 拉起 Python 3.12 环境，不要求用户手工安装到系统 Python。
+推荐安装方式：必须使用 `curl` 获取仓库根目录的 `install.py`，让安装器下载 GitHub zip 包并复制完整 skill，不要只保存 `SKILL.md`。安装器自身只依赖 Python 标准库，不依赖 git，Windows / macOS / Linux 都可用；安装完成后会在目标用户的 skill 目录内创建私有 `.venv` 并安装固定依赖。如果目标用户环境没有 Python 3.12，安装器会尝试先安装/使用 `uv` 拉起 Python 3.12 环境，不要求用户手工安装到系统 Python。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/master/install.py | python - --repo chongchong59699/115-netdisk-skill --branch master
@@ -57,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/chongchong59699/115-netdisk-skill/m
    - 优先使用 `$CODEX_HOME/skills`
    - 未设置时使用 `~/.codex/skills`
    - 最终目录应为 `~/.codex/skills/115-netdisk/SKILL.md`
-4. 安装器会自动创建 `115-netdisk/.venv` 并安装 `requirements.txt`；优先使用系统 Python 3.12+，没有时尝试通过 `uv` 自举 Python 3.12。业务脚本会自动切换到这个私有 `.venv`，agent 不需要记住解释器路径。
+4. 安装器会自动创建 `115-netdisk/.venv` 并安装固定版本的 `requirements.txt`；优先使用 Python 3.12，没有时尝试通过 `uv` 自举 Python 3.12。业务脚本会自动切换到这个私有 `.venv`，agent 不需要记住解释器路径。
 5. 安装后枚举运行 `python -m py_compile scripts/*.py` 验证 Python 脚本语法；仅在 Windows/PowerShell 可用时检查 `scripts/get_cookie.ps1`。如果依赖安装失败，必须在安装阶段明确告知用户，而不是等扫码后才说缺少 `p115client`。
 
 PowerShell 7 示例，替换 `chongchong59699`、`REPO`、`BRANCH` 后执行：
@@ -250,7 +250,7 @@ python3 scripts/offline_download.py --list
 
 ## 安装依赖
 
-p115client 当前要求 Python 3.12+：
+p115client 当前固定在 Python 3.12 环境：
 
 ```bash
 python3.12 -m pip install p115client
